@@ -10,6 +10,7 @@
  * 日期        | 修改者     | 修改说明
  * ------------|------------|---------------------------
  * 2024-03-19  | sisi    | 创建文件
+ * 2024-05-19  | sisi    | 修复了侧边栏第一次点击导航不对的问题
  */
 
 class OheaderChange {
@@ -71,7 +72,7 @@ class OheaderChange {
     }
   }
 
-
+  //待处理问题：location-changed 在这里会重复添加
   setScrollTop(views) {
     this.scrollTopArr = [];
     views.forEach((view, index) => {
@@ -477,7 +478,7 @@ window.addEventListener("location-changed", (e) => {
   if(window.oldLocation !== urlSplit){
     window.oldLocation = urlSplit;
     console.log("urlSplit",urlSplit);
-    window.OheaderChange = new OheaderChange();
+    window.OheaderChange;
   }
   
 });
@@ -490,7 +491,6 @@ Promise.resolve(customElements.whenDefined("hui-view")).then(() => {
     // console.log("OheaderChange loaded");
    }
 });
-
 
 
 
