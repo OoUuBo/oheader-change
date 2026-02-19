@@ -24,15 +24,16 @@ class OheaderChange {
     this.llAttempts = 0;//尝试次数
     document.documentElement.style.setProperty("--header-height", "80px");
     this.ha = document.querySelector("home-assistant");
-    this.panels = this.ha.hass.panels;
+    // this.panels = this.ha.hass.panels;
     this.main = this.ha.shadowRoot.querySelector(
       "home-assistant-main"
     ).shadowRoot;
     this.aside = this.main.querySelector("ha-drawer").shadowRoot.querySelector("aside");//原始侧边导航
     // console.log("this.aside", this.aside);
-    this.user = this.ha.hass.user;
+    // this.user = this.ha.hass.user;
     
     this.ppr = this.main.querySelector("partial-panel-resolver");
+    // 监听dashboard切换
     new MutationObserver(this.watchDashboards).observe(this.ppr, {
       childList: true,
     });
@@ -46,7 +47,8 @@ class OheaderChange {
     // console.log("lovelace", lovelace);
     // console.log("window.location.href",window.location.href.includes("?disableOheader"));
     
-
+    this.panelUrl = this.ha.hass.panelUrl;
+    console.log("this.ha.hass.panelUrl",this.ha.hass.panelUrl);
     this.viewIndex = 0; //初始化view序号
     if (!lovelace||window.location.href.includes("?disableOheader")) {
       // window.OHassHeaderPositionCard = undefined;
@@ -58,7 +60,6 @@ class OheaderChange {
   }
 
   getConfig(lovelace) {
-    this.panelUrl = this.ha.hass.panelUrl;
     this.llAttempts++;
     try {
       this.llConfig = lovelace.lovelace.config;
@@ -428,18 +429,19 @@ class OheaderChange {
 
   // Run on dashboard change.
   watchDashboards = (mutations) => {
-    // console.log("mutations", mutations);
+    console.log("mutations", mutations);
     const pathname = window.location.pathname;
     const urlSplit = pathname.split("/");
-    // console.log("oldpanelurl", this.panelUrl);
-    // console.log("newpanelurl", urlSplit[1]);
+    console.log("oldpanelurl", this.panelUrl);
+    console.log("newpanelurl", urlSplit[1]);
     if (this.panelUrl !== urlSplit[1]) {
       mutations.forEach(({ addedNodes }) => {
-        // console.log("addedNodes",addedNodes);
+        console.log("addedNodes",addedNodes);
         // console.log("addedNodes",addedNodes.includes("ha-panel"));
         for (let node of addedNodes)
           if (node.localName.includes("ha-panel-")) {
             this.run();
+            console.log("new run");
           }
       });
     }
@@ -534,14 +536,32 @@ window.addEventListener("location-changed", (e) => {
 });*/
 
 // Initial Run
+(()=>{
+  // 定义唯一标识，避免重复执行
+  const INIT_FLAG = 'OheaderChange_initialized';
+  // 等待 hui-view 定义完成
+  Promise.resolve(customElements.whenDefined("hui-view")).then(() => {
+    // 双重校验：既检查全局变量，也检查标识
+    if (!window.OheaderChange && !document.body.dataset[INIT_FLAG]) {
+      // 假设 OheaderChange 是你定义的类，这里做防错处理
+        if (typeof OheaderChange === 'function') {
+          window.OheaderChange = new OheaderChange();
+          // 标记已初始化，防止重复创建
+          document.body.dataset[INIT_FLAG] = 'true';
+          console.log("OheaderChange 初始化完成");
+        } else {
+          console.error("OheaderChange 类未定义，初始化失败");
+        }
+    } else if (window.OheaderChange) {
+      console.log("OheaderChange 已存在，跳过初始化");
+    }
+  })
+  .catch((err) => {
+    // 捕获可能的异常，避免影响其他代码
+      console.error("OheaderChange 初始化过程出错：", err);
+  });
+})();
 
-Promise.resolve(customElements.whenDefined("hui-view")).then(() => {
-  if (!window.OheaderChange) {
-
-    window.OheaderChange = new OheaderChange();
-    console.log("OheaderChange new");
-   }
-});
 
 
 
