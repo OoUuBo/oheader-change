@@ -1,8 +1,8 @@
 /**
  * @file        oheader-change.js
  * @description 1、改变原有导航的位置和样式。 2、可以隐藏不需要的view图标。 3、记录切换前页面的位置，切回时定位到原来的位置。 4、重复点击当前view的图标，可以返回顶部。
- * @version     1.0.2
- * @date        2025-02-28
+ * @version     2.0
+ * @date        2026-02-23
  * @author      sisi
  *
  * @section     修改历史
@@ -16,6 +16,7 @@
  * 2025-02-28  | sisi    | 重构run方法为async/await模式，增强代码可读性
  * 2025-04-08  | sisi    | 修复了记忆页面位置功能失效问题
  * 2026-02-15  | sisi    | 位置记忆功能 改用css 方法，进行中。。。（更新到 github oheader-change 独立仓库中）
+ * 2026-02-23  | sisi    | 优化代码逻辑，优化代码结构，版本更新到 V2.0
  */
 (()=>{
 
