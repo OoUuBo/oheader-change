@@ -1,224 +1,3 @@
-// === 悬浮调试面板组件 - 可直接复制到任意HTML页面 ===
-(function() {
-    // 1. 创建样式（避免污染原有样式）
-    const style = document.createElement('style');
-    style.id = 'debug-panel-style';
-    style.textContent = `
-        #debug-panel {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            width: 420px;
-            max-width: 90vw;
-            height: 70vh;
-            background: #1e1e1e;
-            color: #fff;
-            font-family: Consolas, Monaco, monospace;
-            font-size: 13px;
-            padding: 15px;
-            box-sizing: border-box;
-            overflow-y: auto;
-            z-index: 9999999; /* 最高层级，确保悬浮在最上层 */
-            border-radius: 8px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            resize: both; /* 支持手动调整大小 */
-            min-width: 300px;
-            min-height: 200px;
-        }
-        #debug-panel .debug-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #333;
-        }
-        #debug-panel .debug-title {
-            color: #61dafb;
-            margin: 0;
-            font-size: 16px;
-        }
-        #debug-panel .debug-controls {
-            display: flex;
-            gap: 8px;
-        }
-        #debug-panel .debug-btn {
-            background: #333;
-            border: none;
-            color: #fff;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: background 0.2s;
-        }
-        #debug-panel .debug-btn:hover {
-            background: #007acc;
-        }
-        #debug-panel .debug-btn.close {
-            background: #ff4757;
-        }
-        #debug-panel .debug-btn.close:hover {
-            background: #ff3742;
-        }
-        #debug-panel .debug-item {
-            margin-bottom: 10px;
-            padding: 8px;
-            background: #2d2d2d;
-            border-radius: 4px;
-        }
-        #debug-panel .debug-label {
-            color: #e6d06c;
-            margin-bottom: 4px;
-            font-weight: bold;
-            font-size: 12px;
-        }
-        #debug-panel .debug-data {
-            color: #a9b7c6;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            line-height: 1.4;
-        }
-        /* JSON语法高亮 */
-        #debug-panel .json-key { color: #9cdcfe; }
-        #debug-panel .json-string { color: #ce9178; }
-        #debug-panel .json-number { color: #b5cea8; }
-        #debug-panel .json-boolean { color: #569cd6; }
-        #debug-panel .json-null { color: #569cd6; }
-        /* 拖拽样式 */
-        #debug-panel .drag-handle {
-            width: 100%;
-            height: 10px;
-            cursor: move;
-            position: absolute;
-            top: 0;
-            left: 0;
-            border-radius: 8px 8px 0 0;
-            background: transparent;
-        }
-    `;
-    document.head.appendChild(style);
-
-    // 2. 创建调试面板DOM
-    const panel = document.createElement('div');
-    panel.id = 'debug-panel';
-    panel.innerHTML = `
-        <div class="drag-handle"></div>
-        <div class="debug-header">
-            <h3 class="debug-title">调试面板 🛠️</h3>
-            <div class="debug-controls">
-                <button class="debug-btn clear">清空</button>
-                <button class="debug-btn close">关闭</button>
-            </div>
-        </div>
-        <div id="debug-content"></div>
-    `;
-    document.body.appendChild(panel);
-
-    // 3. 核心功能：调试输出函数
-    window.debugLog = function(label, data) {
-        const debugContent = document.getElementById('debug-content');
-        if (!debugContent) return;
-
-        // 创建数据项
-        const item = document.createElement('div');
-        item.className = 'debug-item';
-
-        // 时间+标签
-        const labelElement = document.createElement('div');
-        labelElement.className = 'debug-label';
-        labelElement.textContent = `[${new Date().toLocaleTimeString()}] ${label}`;
-
-        // 数据展示区
-        const dataElement = document.createElement('div');
-        dataElement.className = 'debug-data';
-
-        try {
-            // 格式化并高亮数据
-            if (typeof data === 'object' && data !== null) {
-                const formatted = JSON.stringify(data, null, 2);
-                // 语法高亮处理
-                const highlighted = formatted.replace(
-                    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-                    match => {
-                        let cls = 'json-string';
-                        if (/^"/.test(match)) cls = /:$/.test(match) ? 'json-key' : 'json-string';
-                        else if (/true|false/.test(match)) cls = 'json-boolean';
-                        else if (/null/.test(match)) cls = 'json-null';
-                        else if (/^\d/.test(match)) cls = 'json-number';
-                        return `<span class="${cls}">${match}</span>`;
-                    }
-                );
-                dataElement.innerHTML = highlighted;
-            } else {
-                // 非对象直接展示
-                dataElement.textContent = typeof data === 'string' ? data : String(data);
-            }
-        } catch (e) {
-            dataElement.textContent = `[格式化失败] ${String(data)}`;
-            dataElement.style.color = '#ff4757';
-        }
-
-        // 添加到面板
-        item.appendChild(labelElement);
-        item.appendChild(dataElement);
-        debugContent.appendChild(item);
-        // 自动滚动到底部
-        debugContent.scrollTop = debugContent.scrollHeight;
-    };
-
-    // 4. 绑定面板控制事件
-    const closeBtn = panel.querySelector('.close');
-    const clearBtn = panel.querySelector('.clear');
-    const dragHandle = panel.querySelector('.drag-handle');
-    const debugContent = document.getElementById('debug-content');
-
-    // 关闭面板
-    closeBtn.addEventListener('click', () => {
-        panel.style.display = 'none';
-    });
-
-    // 清空数据
-    clearBtn.addEventListener('click', () => {
-        debugContent.innerHTML = '';
-    });
-
-    // 5. 实现拖拽功能（支持任意位置悬浮）
-    let isDragging = false;
-    let offsetX, offsetY;
-
-    dragHandle.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        // 获取鼠标相对面板的偏移
-        offsetX = e.clientX - panel.getBoundingClientRect().left;
-        offsetY = e.clientY - panel.getBoundingClientRect().top;
-        // 提升鼠标优先级
-        panel.style.cursor = 'move';
-        e.preventDefault();
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        // 计算新位置
-        const x = e.clientX - offsetX;
-        const y = e.clientY - offsetY;
-        // 限制在可视区域内
-        const maxX = window.innerWidth - panel.offsetWidth;
-        const maxY = window.innerHeight - panel.offsetHeight;
-        panel.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
-        panel.style.top = `${Math.max(0, Math.min(y, maxY))}px`;
-        panel.style.right = 'auto'; // 取消固定右对齐
-    });
-
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-        panel.style.cursor = 'default';
-    });
-
-    // 6. 测试示例（可删除）
-    window.debugLog('面板已初始化', '可以调用 debugLog(标签, 数据) 输出调试信息');
-    window.debugLog('测试对象', { name: '测试', age: 20, list: [1,2,3] });
-})();
 /**
  * @file        oheader-change.js
  * @description 1、改变原有导航的位置和样式。 2、可以隐藏不需要的view图标。 3、记录切换前页面的位置，切回时定位到原来的位置。 4、重复点击当前view的图标，可以返回顶部。
@@ -247,19 +26,10 @@
    * @param {number} fallbackDelay 兜底延迟（默认20ms，可选）
    * @returns {Promise<HTMLElement>} 布局完成的元素
    */
-  const waitForElementReady = async (element, fallbackDelay = 1) => {
-    if (!element) return null;
-
-    // 1. 等待自定义元素DOM渲染完成
-    await element.updateComplete;
-
-    if (fallbackDelay > 0) {
-      await new Promise(resolve => setTimeout(resolve, fallbackDelay));
-      // 兜底后再等一次布局
+  const waitForElementReady = async () => {
+      await new Promise(resolve => setTimeout(resolve, 40));
       await new Promise(resolve => requestAnimationFrame(resolve));
-    }
-
-    return element;
+      await new Promise(resolve => setTimeout(resolve, 4));
   };
   
   // 控制台加载信息
@@ -410,6 +180,7 @@
         super();
       }
       connectedCallback(){
+        if(this.shadowRoot) return;
         const shadow = this.attachShadow({ mode: "open" });
         shadow.appendChild(OCNavButtonTemplate.content.cloneNode(true));
 
@@ -527,6 +298,7 @@
         super();
       }
       connectedCallback(){
+        if(this.shadowRoot) return;
         const shadow =  this.attachShadow({ mode: "open" });
         shadow.appendChild(OCToggleSideBarButtonTemplate.content.cloneNode(true));
       }
@@ -605,6 +377,7 @@
       }
       connectedCallback(){
         // 创建影子根
+        if(this.shadowRoot) return;
         const shadow = this.attachShadow({ mode: "open" });
         shadow.appendChild(OCNavBarTemplate.content.cloneNode(true));
 
@@ -824,12 +597,15 @@
           };
           return;
         }
+
         // 2. 检查是否点击了导航按钮
         const navBtn = e.target.closest("oc-nav-button");
         if (navBtn) {
           const index = navBtn.getAttribute("button-index");
           this.navigateToPath(index);
           DOMS.oNav.highLightButtonByIndex(+index);
+          // 记录当前页面位置
+          this.scrollTopArr[this.viewIndex] = window.scrollY || document.documentElement.scrollTop;
           return;
         }
       }
@@ -863,8 +639,15 @@
         } else {
           history.pushState(null, "", path);
         }
-        const event = new Event("location-changed");
-        window.dispatchEvent(event);
+        // 触发ha location-changed  ，实现view切换
+        const event1 = new Event("location-changed");
+        window.dispatchEvent(event1);
+
+        waitForElementReady().then(() => { 
+          // 此事件发生时调用scroll方法，实现页面位置自动滚动，需要延时触发
+          const event2 = new Event("oheader-location-changed");
+          window.dispatchEvent(event2);
+        });
       }
 
       /** 处理页面位置滚动函数 */
@@ -884,56 +667,37 @@
 
         if (!window._hasLocationChangedListener) {
           const handleLocationChanged = () =>{
-            debugLog('旧top', this.scrollTopArr);
-            const oldViewIndex = this.viewIndex;
-            // 第一步：存储旧视图的滚动位置（精准时机）
-            this.scrollTopArr[oldViewIndex] = window.scrollY || document.documentElement.scrollTop;
-            // view.style.opacity = 0; // 立即隐藏视图，避免闪烁
-            debugLog('新top', this.scrollTopArr);
-            // 第二步：等待新视图布局完全稳定后再恢复滚动
-            waitForElementReady(view).then(() => { 
-              const pathname = window.location.pathname;
-              const urlSplit = pathname.split("/");
-              // 边界校验：路径不符合预期直接返回
-              if (urlSplit[1] !== this.panelUrl) return;
+            const pathname = window.location.pathname;
+            const urlSplit = pathname.split("/");
+            // 边界校验：路径不符合预期直接返回
+            if (urlSplit[1] !== this.panelUrl) return;
 
-              const tag = urlSplit[2];
-              let newViewIndex = -1;
+            const tag = urlSplit[2];
+            let newViewIndex = -1;
 
-              const num = Number(tag);
-              if (!isNaN(num) && num >= 0 && num < views.length) {
-                newViewIndex = num;
-              } else {
-                newViewIndex = views.findIndex(view => view.path === tag);
-              }
+            const num = Number(tag);
+            if (!isNaN(num) && num >= 0 && num < views.length) {
+              newViewIndex = num;
+            } else {
+              newViewIndex = views.findIndex(view => view.path === tag);
+            }
 
-              // 边界校验：newViewIndex无效时重置为0
-              if (newViewIndex === -1 || newViewIndex >= views.length) {
-                newViewIndex = 0;
-              }
+            // 边界校验：newViewIndex无效时重置为0
+            if (newViewIndex === -1 || newViewIndex >= views.length) {
+              newViewIndex = 0;
+            }
 
-              // 滚动位置计算
-              const targetScrollTop = (this.viewIndex === newViewIndex)  ? 0 : (this.scrollTopArr[newViewIndex] || 0);
-                
-              // 实现平滑滚动，代替document.documentElement.scrollTop = targetScrollTop;
-              debugLog('targetScrollTop', targetScrollTop);
-              this._smoothScrollTo(targetScrollTop);
+            // 滚动位置计算
+            const targetScrollTop = (this.viewIndex === newViewIndex)  ? 0 : (this.scrollTopArr[newViewIndex] || 0);
               
-              // 更新视图索引
-              this.viewIndex = newViewIndex;
-              
-              // 新增：触发滚动完成事件
-              const oHeaderscrollCompleteEvent = new CustomEvent('oheader-scroll-restoration-complete', {
-                detail: {
-                  oldIndex: oldViewIndex,
-                  newIndex: newViewIndex,
-                  scrollTop: document.documentElement.scrollTop
-                }
-              });
-              window.dispatchEvent(oHeaderscrollCompleteEvent);              
-            });
+            // 实现平滑滚动，代替document.documentElement.scrollTop = targetScrollTop;
+            // debugLog('targetScrollTop', targetScrollTop);
+            this._smoothScrollTo(targetScrollTop,true);
+            
+            // 更新视图索引
+            this.viewIndex = newViewIndex;                    
           }
-          window.addEventListener("location-changed", handleLocationChanged);
+          window.addEventListener("oheader-location-changed", handleLocationChanged);
           window._hasLocationChangedListener = true; // 标记已经存在监听器
         }
         
@@ -959,53 +723,54 @@
       }
 
       // 新增：平滑滚动函数（核心优化，替代瞬间scrollTop）
-      _smoothScrollTo(top,smooth) {
-        // 边界值处理：确保top为非负数
-        const targetTop = Math.max(0, Number(top) || 0);
+      _smoothScrollTo(targetTop) {
+        // document.documentElement.scrollTop = targetTop;
+        // // 边界值处理：确保top为非负数
+        // const targetTop = Math.max(0, Number(top) || 0);
         
-        if (smooth && 'scrollBehavior' in document.documentElement.style) {
-          // 现代iOS（15.4+）开启平滑滚动
-          window.scrollTo({
-            top: targetTop,
-            left: 0,
-            behavior: 'smooth'
-          });
-        } else {
-          // 兼容所有iPhone/iOS版本的核心写法（无动画，最稳定）
-          window.scrollTo(0, targetTop);
-          // 兜底：解决部分iOS版本scrollTo不生效的问题
-          document.documentElement.scrollTop = targetTop;
-          document.body.scrollTop = targetTop;
-        }
-        // const currentTop = window.scrollY || document.documentElement.scrollTop;
-        // // 目标位置和当前位置一致时，无需滚动
-        // if (Math.abs(currentTop - targetTop) < 1) return;
-
-        // // 平滑滚动配置（兼容原生smooth行为）
-        // try {
+        // if (smooth && 'scrollBehavior' in document.documentElement.style) {
+        //   // 现代iOS（15.4+）开启平滑滚动
         //   window.scrollTo({
         //     top: targetTop,
-        //     behavior: 'smooth' // 原生平滑滚动，丝滑无卡顿
+        //     left: 0,
+        //     behavior: 'smooth'
         //   });
-        // } catch (e) {
-        //   // 兼容不支持smooth的浏览器，用定时器模拟
-        //   const duration = 300; // 滚动时长（ms）
-        //   const start = currentTop;
-        //   const distance = targetTop - start;
-        //   const startTime = performance.now();
-
-        //   const step = (currentTime) => {
-        //     const elapsed = currentTime - startTime;
-        //     const progress = Math.min(elapsed / duration, 1);
-        //     // 缓动函数：ease-out，让滚动更自然
-        //     const easeProgress = 1 - Math.pow(1 - progress, 3);
-        //     window.scrollTo(0, start + distance * easeProgress);
-        //     if (progress < 1) {
-        //       requestAnimationFrame(step);
-        //     }
-        //   };
-        //   requestAnimationFrame(step);
+        // } else {
+        //   // 兼容所有iPhone/iOS版本的核心写法（无动画，最稳定）
+        //   window.scrollTo(0, targetTop);
+        //   // 兜底：解决部分iOS版本scrollTo不生效的问题
+        //   document.documentElement.scrollTop = targetTop;
+        //   document.body.scrollTop = targetTop;
         // }
+        const currentTop = window.scrollY || document.documentElement.scrollTop;
+        // 目标位置和当前位置一致时，无需滚动
+        if (Math.abs(currentTop - targetTop) < 1) return;
+
+        // 平滑滚动配置（兼容原生smooth行为）
+        try {
+          window.scrollTo({
+            top: targetTop,
+            behavior: 'smooth' // 原生平滑滚动，丝滑无卡顿
+          });
+        } catch (e) {
+          // 兼容不支持smooth的浏览器，用定时器模拟
+          const duration = 300; // 滚动时长（ms）
+          const start = currentTop;
+          const distance = targetTop - start;
+          const startTime = performance.now();
+
+          const step = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            // 缓动函数：ease-out，让滚动更自然
+            const easeProgress = 1 - Math.pow(1 - progress, 3);
+            window.scrollTo(0, start + distance * easeProgress);
+            if (progress < 1) {
+              requestAnimationFrame(step);
+            }
+          };
+          requestAnimationFrame(step);
+        }
       }
     }
 
