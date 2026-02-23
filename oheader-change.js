@@ -76,7 +76,6 @@
       
       DATA.config = DOMS.lovelace.lovelace?.config;
       if(!DATA.config) return false;
-      console.log("DATA.config",DATA.config);
       DATA.oheaderConfig = DATA.config.o_header != null ? DATA.config.o_header : {};
       DATA.viewsConfig = DATA.config.views || {};
 
@@ -398,7 +397,6 @@
        * @param {number} index - 索引
        */
       async addButton(icon, name, index) {
-        console.log("addButton",icon,name,index);
         await this.readyPromise;
         const button = document.createElement('oc-nav-button');
         
