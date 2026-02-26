@@ -47,7 +47,6 @@
 
   // 等待 hui-view 定义完成， 初始化
   Promise.resolve(customElements.whenDefined("hui-view")).then(async() => {
-
     // 缓存数组：DOMS 和 DATA
     const DOMS = {};
     const DATA = {};
@@ -58,6 +57,8 @@
     /**
      * 获取doms和data
      * @return {void} 成功返回true 失败返回false
+     * @param {object} DOMS - 接收doms
+     * @param {object} DATA - 接收data
      */
     function getDomsAndData() { 
       DOMS.ha = document.querySelector("home-assistant");
@@ -93,6 +94,7 @@
           const initSuccess = getDomsAndData();
           if (initSuccess) {
             // 初始化成功，执行后续业务逻辑
+            console.log("DATA.viewsConfig",DATA.viewsConfig)
             resolve(true);
             return;
           }
@@ -165,9 +167,9 @@
         </style>
         <div class='o_nav_button'>
           <div class="o_nav_icon">
-            <ha-icon display-mode="icon" icon="{{view.icon}}"></ha-icon>
+            <ha-icon display-mode="icon" icon=""></ha-icon>
           </div>
-          <p class="o_nav_text">{{view.title}}</p>
+          <p class="o_nav_text"></p>
         </div>
     `;
 
@@ -319,8 +321,8 @@
             left: 0;
             right: 0;
             height: 100%;
-            width: 100%;
-            background-color: var(--primary-color);
+            width: 100%; 
+            background-color: ${DATA.oheaderConfig.background_color || "var(--app-header-background-color)" || "var(--primary-background-color)"};
           }
 
           .o_nav_bar > oc-toggle-side-bar-button {
@@ -464,6 +466,12 @@
         DOMS.huiRoot = DOMS.hui.shadowRoot;
         if (!DOMS.huiRoot) return;
 
+        // 刷新缓存
+        DATA.config = DOMS.lovelace.lovelace?.config;
+        if(!DATA.config) return false;
+        DATA.oheaderConfig = DATA.config.o_header != null ? DATA.config.o_header : {};
+        DATA.viewsConfig = DATA.config.views || {};
+
         this.panelUrl = DOMS.ha.hass.panelUrl;
         this.viewIndex = 0; //初始化view序号
 
@@ -488,7 +496,7 @@
         const huiRoot = DOMS.huiRoot;
 
         // 添加要调整的 #view 容器 和 导航 布局样式
-        const mainNavHeight = (oheaderConfig.height || 80) / 14 + 'rem'; //主导航的高度,单位是px
+        const mainNavHeight = oheaderConfig.height || (5.7 + 'rem'); //主导航的高度,单位是px
         const contentContainerStyle = `
               #view {
               
@@ -528,7 +536,6 @@
               z-index: 4;
               height: ${mainNavHeight};
               width: 100vw;
-              background: ${oheaderConfig.nav_background_color || "var(--app-header-background-color)" || "var(--primary-background-color)"};
               overflow-y: hidden;
               -webkit-overflow-scrolling: touch; /* 启用触摸滚动 */
               // touch-action: manipulation; /* 只允许点击，禁止滚动和缩放 */
@@ -555,7 +562,6 @@
                 justify-content: space-evenly;
                 top: env(safe-area-inset-top);
                 left: env(safe-area-inset-left);
-                background: ${oheaderConfig.nav_background_color || "var(--app-header-background-color)" || "var(--primary-background-color)"};
               }
             }
             `;

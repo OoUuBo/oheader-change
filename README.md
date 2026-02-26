@@ -22,8 +22,10 @@
 ```yaml
 # 在配置文件的最外层添加o_header属性
 o_header: {
+    height: 60px, # 导航栏高度，默认 5.7rem。必须带单位。
     showMode: 'icon', #  显示模式，可选值：icon（仅图标）、text（仅文字）。默认时图标 文字同时显示。
-    color：blue; # 图标和文字颜色
+    color：blue, # 图标和文字颜色
+    background-color：#f5f5f5, # 导航栏背景颜色
 }
 
 # 视图配置
