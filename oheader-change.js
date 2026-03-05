@@ -643,15 +643,10 @@
         } else {
           history.pushState(null, "", path);
         }
+
         // 触发ha location-changed  ，实现view切换
         const event1 = new Event("location-changed");
         window.dispatchEvent(event1);
-
-        waitForElementReady().then(() => { 
-          // 此事件发生时调用scroll方法，实现页面位置自动滚动，需要延时触发
-          const event2 = new Event("oheader-location-changed");
-          window.dispatchEvent(event2);
-        });
       }
 
       /** 处理页面位置滚动函数 */
@@ -670,7 +665,7 @@
         });
 
         if (!window._hasLocationChangedListener) {
-          const handleLocationChanged = () =>{
+          const handleOheaderLocationChanged = () =>{
             const pathname = window.location.pathname;
             const urlSplit = pathname.split("/");
             // 边界校验：路径不符合预期直接返回
@@ -701,7 +696,15 @@
             // 更新视图索引
             this.viewIndex = newViewIndex;                    
           }
-          window.addEventListener("oheader-location-changed", handleLocationChanged);
+          const handleLocationChanged = () => {
+            waitForElementReady().then(() => { 
+              // 此事件发生时调用scroll方法，实现页面位置自动滚动，需要延时触发
+              const event2 = new Event("oheader-location-changed");
+              window.dispatchEvent(event2);
+            });
+          }
+          window.addEventListener("location-changed", handleLocationChanged);
+          window.addEventListener("oheader-location-changed", handleOheaderLocationChanged);
           window._hasLocationChangedListener = true; // 标记已经存在监听器
         }
         
