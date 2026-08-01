@@ -282,6 +282,11 @@
               color: inherit;
               transform: rotate(90deg);
             }
+            @media screen and (orientation: landscape) {
+              .o_toggle_side_bar_button ha-icon {
+                transform: rotate(0deg);
+              }
+            }
 
         </style>
         <div class="o_toggle_side_bar_button">
@@ -349,6 +354,9 @@
               position: absolute;
               height: 0.85rem;
               top: 1rem;
+              left: 50%;
+              transform: translateX(-50%);
+              width: auto;
             }
           }
         </style>
