@@ -117,6 +117,9 @@
     const OCNavButtonTemplate = document.createElement('template');
     OCNavButtonTemplate.innerHTML = /*html*/`
         <style>
+          :host {
+            outline: none;
+          }
           .o_nav_button {
             display: flex;
             flex-direction: column;
@@ -131,6 +134,9 @@
             width: 50px;
             height: 100%;
             color: ${DATA.oheaderConfig.color || "var(--app-header-text-color)"};
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: none;
           }
 
           .o_nav_button ha-icon {
