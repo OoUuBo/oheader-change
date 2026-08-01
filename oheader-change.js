@@ -158,15 +158,15 @@
             transform: scale(0.88);
           }
 
-          /* 激活按钮样式：图标/文字变激活色（可配 activeColor，默认纯白，深浅模式下对比都最好），文字加粗 */
+          /* 激活按钮样式：图标/文字变激活色（可配 activeColor，默认柔和浅灰，不刺眼且对比清晰），文字加粗 */
           .o_nav_button.active {
             opacity: 1;
           }
           .o_nav_button.active ha-icon {
-            color: ${DATA.oheaderConfig.activeColor || "#fff"};
+            color: ${DATA.oheaderConfig.activeColor || "#e0e0e0"};
           }
           .o_nav_button.active p {
-            color: ${DATA.oheaderConfig.activeColor || "#fff"};
+            color: ${DATA.oheaderConfig.activeColor || "#e0e0e0"};
             font-weight: bold;
           }
           @media screen and (orientation: landscape) { 
