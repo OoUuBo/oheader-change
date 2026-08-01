@@ -20,18 +20,6 @@
  */
 (()=>{
 
-  /**
-   * 等待元素DOM渲染+布局完成（HA场景专用）
-   * @param {HTMLElement} element 目标元素（如hui-view）
-   * @param {number} fallbackDelay 兜底延迟（默认20ms，可选）
-   * @returns {Promise<HTMLElement>} 布局完成的元素
-   */
-  const waitForElementReady = async () => {
-      await new Promise(resolve => setTimeout(resolve, 40));
-      await new Promise(resolve => requestAnimationFrame(resolve));
-      await new Promise(resolve => setTimeout(resolve, 4));
-  };
-  
   // 控制台加载信息
   const conInfo = { header: "%c≡ OHassHeaderPositionCard".padEnd(27), ver: "%cversion *DEV " };
   const br = "%c\n";
@@ -85,35 +73,21 @@
 
     /**
       * 检测doms和data获取是否成功，并重试
+      * 永不放弃：初始化失败后持续轮询，直到 Lovelace 面板出现
       */ 
     async function waitAndInitLovelace(maxRetry = 10, delay = 500) {
-      return new Promise((resolve, reject) => { 
-        let retryCount = 0;
-        // 执行初始化并处理重试
+      return new Promise((resolve) => {
         const tryInit = () => {
-          const initSuccess = getDomsAndData();
-          if (initSuccess) {
-            // 初始化成功，执行后续业务逻辑
-            console.log("DATA.viewsConfig",DATA.viewsConfig)
+          if (getDomsAndData()) {
+            clearInterval(timer);
             resolve(true);
-            return;
-          }
-
-          // 未成功且未到最大重试次数，延迟重试
-          if (retryCount < maxRetry) {
-            retryCount++;
-            console.log(`[初始化] 重试(${retryCount}/${maxRetry})，${delay}ms 后再次尝试`);
-            setTimeout(tryInit, delay);
-          } else {
-            console.error("[初始化] 多次重试仍未完成 Lovelace DOM 初始化");
-            resolve(false);
           }
         };
-
-        // 等待 hui-view 定义完成后开始首次尝试
+        // 首次尝试
         tryInit();
+        // 持续重试直到成功（解决远程/慢速环境下初始化超时即死的问题）
+        const timer = setInterval(tryInit, delay);
       });
-      
     }
     /************************ 定义导航按钮 ***********************/
     /**
@@ -454,7 +428,7 @@
       }
 
       // 主函数
-      run() {
+      run(retry = 0) {
         // 检测url中是否有disableOheader参数，有则终结运行
         if(window.location.href.includes("?disableOheader")) return;
 
@@ -462,13 +436,25 @@
         DOMS.lovelace = DOMS.ppr.querySelector("ha-panel-lovelace");
         if (!DOMS.lovelace) return;
         DOMS.hui = DOMS.lovelace.shadowRoot.querySelector("hui-root");
-        if (!DOMS.hui) return;
+        if (!DOMS.hui) {
+          // hui-root 未就绪：带重试等待，避免慢速环境下渲染丢失
+          if (retry < 5) {
+            setTimeout(() => this.run(retry + 1), 300);
+          }
+          return;
+        }
         DOMS.huiRoot = DOMS.hui.shadowRoot;
         if (!DOMS.huiRoot) return;
 
         // 刷新缓存
         DATA.config = DOMS.lovelace.lovelace?.config;
-        if(!DATA.config) return false;
+        if(!DATA.config) {
+          // config 未就绪同样带重试等待
+          if (retry < 5) {
+            setTimeout(() => this.run(retry + 1), 300);
+          }
+          return false;
+        }
         DATA.oheaderConfig = DATA.config.o_header != null ? DATA.config.o_header : {};
         DATA.viewsConfig = DATA.config.views || {};
 
@@ -565,11 +551,14 @@
               }
             }
             `;
-        this.addStyle(contentContainerStyle + navStyle, huiRoot);
+        this.addStyle(contentContainerStyle + navStyle, huiRoot, 'oheader-style');
 
         // 移除原始导航栏
-        const oldHeader = huiRoot.querySelector("div").querySelector(".header");
-        oldHeader.style.display = 'none';
+        const oldHeader = huiRoot.querySelector("div")?.querySelector(".header");
+        if (oldHeader) oldHeader.style.display = 'none';
+
+        // 幂等：先移除旧的导航栏，避免重复渲染叠加
+        huiRoot.querySelector("oc-nav-bar")?.remove();
 
         // 创建新导航栏
         const o_nav = document.createElement("oc-nav-bar");
@@ -583,7 +572,7 @@
           }
         });
 
-        huiRoot.querySelector("div").appendChild(o_nav);
+        huiRoot.querySelector("div")?.appendChild(o_nav);
         
         // 导航栏监听事件
         o_nav.shadowRoot.querySelector(".o_nav_bar").addEventListener("click",(e)=>{
@@ -608,8 +597,7 @@
           const index = navBtn.getAttribute("button-index");
           this.navigateToPath(index);
           DOMS.oNav.highLightButtonByIndex(+index);
-          // 记录当前页面位置
-          this.scrollTopArr[this.viewIndex] = window.scrollY || document.documentElement.scrollTop;
+          // 滚动位置统一在 location-changed 时记录（覆盖点击/侧边栏/前进后退所有切换方式）
           return;
         }
       }
@@ -655,106 +643,198 @@
         const huiRoot = DOMS.huiRoot;
         if (!huiRoot) return; // 边界校验：huiRoot不存在直接返回
 
-        const view = huiRoot.querySelector("div#view") || huiRoot.querySelector("div").querySelector("#view");
+        const view = huiRoot.querySelector("div#view") || huiRoot.querySelector("div")?.querySelector("#view");
         if (!view) return; // 边界校验：view节点不存在直接返回
 
         // 2. 初始化滚动位置数组（优化写法，避免forEach冗余）
-        this.scrollTopArr = [];
-        views.forEach((view, index) => {
-          this.scrollTopArr.push(0);
+        this.scrollTopArr = (views || []).map(() => 0);
+
+        // 3. 每次 run 重新注册监听器，避免闭包捕获旧 views（陈旧闭包问题）
+        if (this._handleLocationChanged) {
+          window.removeEventListener("location-changed", this._handleLocationChanged);
+        }
+
+        // 解析 URL 得到目标视图索引（纯路径解析，不依赖渲染，可同步执行）
+        const resolveViewIndex = () => {
+          const viewsNow = DATA.viewsConfig || []; // 实时读取，避免旧闭包快照
+          const pathname = window.location.pathname;
+          const urlSplit = pathname.split("/");
+          // 边界校验：路径不符合预期直接返回
+          if (urlSplit[1] !== this.panelUrl) return -2; // -2 表示非本面板
+
+          const tag = urlSplit[2];
+          const num = Number(tag);
+          let index = -1;
+          if (!isNaN(num) && num >= 0 && num < viewsNow.length) {
+            index = num;
+          } else {
+            index = viewsNow.findIndex(view => view.path === tag);
+          }
+          // 边界校验：index无效时重置为0
+          if (index === -1 || index >= viewsNow.length) {
+            index = 0;
+          }
+          return index;
+        };
+
+        // 等待新视图真正出现并渲染完成：
+        // 1. MutationObserver 捕获 HA 切换视图（旧 hui-view 移除/新添加）
+        // 2. await hui-view.updateComplete（lit 渲染完成信号，HA 原生机制，500ms 超时兜底）
+        // 3. light DOM 内容非空（hui-view 用 createRenderRoot 返回 this，卡片是直接子节点）
+        // 4. 双 rAF 确认首帧绘制完成
+        // 说明：不使用 scrollHeight 稳定判定——#view 有 min-height:100vh，
+        // 空视图高度恒为 100vh，高度信号无法区分"空视图"和"渲染完成"
+        const waitForNewViewReady = () => new Promise((resolve) => {
+          const container = () => DOMS.huiRoot?.querySelector("div#view") || DOMS.huiRoot?.querySelector("div")?.querySelector("#view");
+          const c = container();
+          if (!c) { resolve(); return; }
+
+          const startChild = c.lastChild;
+          let started = false;
+          let attempts = 0;
+
+          const checkReady = () => {
+            const huiView = c.lastChild;
+            // 1. hui-view 元素存在
+            if (!huiView || huiView.localName !== 'hui-view') {
+              if (attempts++ < 60) setTimeout(checkReady, 100); else resolve();
+              return;
+            }
+            // 2. lit 渲染完成信号（加超时竞争，防止 updateComplete 挂起导致死锁）
+            const ready = Promise.race([
+              Promise.resolve(huiView.updateComplete).catch(() => {}),
+              new Promise(r => setTimeout(r, 500))
+            ]);
+            ready.then(() => {
+              // 3. 内容非空：hui-view 渲染在 light DOM（createRenderRoot 返回 this，无 shadowRoot），
+              //    卡片/布局元素是 hui-view 的直接子节点
+              const hasContent = huiView.childElementCount > 0;
+              if (!hasContent) {
+                if (attempts++ < 60) setTimeout(checkReady, 100); else resolve();
+                return;
+              }
+              // 4. 双 rAF 确认首帧绘制完成
+              requestAnimationFrame(() => requestAnimationFrame(resolve));
+            });
+          };
+
+          const startWaiting = () => {
+            if (started) return;
+            started = true;
+            checkReady();
+          };
+
+          // HA 的 _selectView 会替换容器子节点，观察子节点变化
+          const mo = new MutationObserver(() => startWaiting());
+          mo.observe(c, { childList: true });
+
+          // 兜底：_selectView 已执行完（子节点已替换）；checkReady 启动后退出，避免抢占 attempts 计数
+          const fallbackCheck = () => {
+            if (started) { mo.disconnect(); return; }
+            if (c.lastChild !== startChild) {
+              startWaiting();
+            } else if (attempts++ < 40) {
+              setTimeout(fallbackCheck, 100);
+            } else {
+              mo.disconnect();
+              resolve();
+            }
+          };
+          fallbackCheck();
         });
 
-        if (!window._hasLocationChangedListener) {
-          const handleOheaderLocationChanged = () =>{
-            const pathname = window.location.pathname;
-            const urlSplit = pathname.split("/");
-            // 边界校验：路径不符合预期直接返回
-            if (urlSplit[1] !== this.panelUrl) return;
+        const handleLocationChanged = () => {
+          const newViewIndex = resolveViewIndex();
+          if (newViewIndex === -2) return; // 非本面板，不记录不处理
 
-            const tag = urlSplit[2];
-            let newViewIndex = -1;
+          // 同步记录旧视图位置：location-changed 派发瞬间旧视图还在，位置准确
+          // （覆盖点击导航/侧边栏/前进后退所有切换方式）
+          const oldIndex = this.viewIndex;
+          this.scrollTopArr[oldIndex] = window.scrollY || document.documentElement.scrollTop;
+          this.viewIndex = newViewIndex;
 
-            const num = Number(tag);
-            if (!isNaN(num) && num >= 0 && num < views.length) {
-              newViewIndex = num;
-            } else {
-              newViewIndex = views.findIndex(view => view.path === tag);
-            }
-
-            // 边界校验：newViewIndex无效时重置为0
-            if (newViewIndex === -1 || newViewIndex >= views.length) {
-              newViewIndex = 0;
-            }
-
-            // 滚动位置计算
-            const targetScrollTop = (this.viewIndex === newViewIndex)  ? 0 : (this.scrollTopArr[newViewIndex] || 0);
-              
-            // 实现平滑滚动，代替document.documentElement.scrollTop = targetScrollTop;
-            // debugLog('targetScrollTop', targetScrollTop);
-            this._smoothScrollTo(targetScrollTop,true);
-            
-            // 更新视图索引
-            this.viewIndex = newViewIndex;                    
+          // 同一视图（重复点击回顶部）：无需等待渲染
+          if (oldIndex === newViewIndex) {
+            this._smoothScrollTo(0, true);
+            return;
           }
-          const handleLocationChanged = () => {
-            waitForElementReady().then(() => { 
-              // 此事件发生时调用scroll方法，实现页面位置自动滚动，需要延时触发
-              const event2 = new Event("oheader-location-changed");
-              window.dispatchEvent(event2);
+
+          // 切换瞬间隐藏视图：新视图在不可见状态下渲染，渲染过程不可见（避免"先显示再闪"）
+          const viewEl = DOMS.huiRoot?.querySelector("div#view") || DOMS.huiRoot?.querySelector("div")?.querySelector("#view");
+          if (viewEl) {
+            viewEl.style.transition = 'none';
+            viewEl.style.opacity = '0';
+            void viewEl.offsetHeight; // 强制重排，立即生效（不触发淡出）
+          }
+
+          const targetScrollTop = this.scrollTopArr[newViewIndex] || 0;
+
+          // 等新视图渲染完成 → 滚动 → 淡入（掩盖首次渲染的突变）
+          waitForNewViewReady().then(() => {
+            if (viewEl) {
+              viewEl.style.transition = 'opacity 0.06s ease-out';
+            }
+            this._smoothScrollTo(targetScrollTop, true);
+            requestAnimationFrame(() => {
+              if (viewEl) viewEl.style.opacity = '1';
             });
-          }
-          window.addEventListener("location-changed", handleLocationChanged);
-          window.addEventListener("oheader-location-changed", handleOheaderLocationChanged);
-          window._hasLocationChangedListener = true; // 标记已经存在监听器
-        }
-        
+          });
+        };
+        this._handleLocationChanged = handleLocationChanged;
+        window.addEventListener("location-changed", handleLocationChanged);
       }
 
-      /** 重新渲染  */
+      /** 重新渲染：防抖 + 仅在 Lovelace 面板存在时执行  */
       watchDashboards = (mutations) => {
-        // 延时确保元素挂载到文档中，不然会造成run执行过早 获取不到dom元素，异常退出。
-        setTimeout(()=>{
+        clearTimeout(this._watchTimer);
+        this._watchTimer = setTimeout(() => {
+          // 当前不是 Lovelace 面板则不空跑
+          if (!DOMS.ppr?.querySelector("ha-panel-lovelace")) return;
           this.run();
-        },500);
+        }, 500);
       };
 
       /**
-       * 给自定义元素增加css样式
+       * 给自定义元素增加css样式（幂等：同id样式只保留一份）
        * @param {*} css 
        * @param {*} elem 
+       * @param {string} id 样式标识
        */
-      addStyle(css, elem) {
+      addStyle(css, elem, id) {
+        if (id) elem.querySelector('#' + id)?.remove();
         const style = document.createElement("style");
+        if (id) style.id = id;
         style.innerHTML = css;
         elem.appendChild(style);
       }
 
       // 新增：平滑滚动函数（核心优化，替代瞬间scrollTop）
       _smoothScrollTo(targetTop) {
-        // document.documentElement.scrollTop = targetTop;
-        // // 边界值处理：确保top为非负数
-        // const targetTop = Math.max(0, Number(top) || 0);
-        
-        // if (smooth && 'scrollBehavior' in document.documentElement.style) {
-        //   // 现代iOS（15.4+）开启平滑滚动
-        //   window.scrollTo({
-        //     top: targetTop,
-        //     left: 0,
-        //     behavior: 'smooth'
-        //   });
-        // } else {
-        //   // 兼容所有iPhone/iOS版本的核心写法（无动画，最稳定）
-        //   window.scrollTo(0, targetTop);
-        //   // 兜底：解决部分iOS版本scrollTo不生效的问题
-        //   document.documentElement.scrollTop = targetTop;
-        //   document.body.scrollTop = targetTop;
-        // }
         const currentTop = window.scrollY || document.documentElement.scrollTop;
-        // 目标位置和当前位置一致时，无需滚动
-        if (Math.abs(currentTop - targetTop) < 1) return;
+
+        // 滚动完成通知（兼容 o-sticky-card 等卡片联动）
+        let notified = false;
+        const notifyComplete = () => {
+          if (notified) return;
+          notified = true;
+          window.removeEventListener('scrollend', notifyComplete);
+          window.dispatchEvent(new CustomEvent('oheader-scroll-restoration-complete', {
+            detail: { targetTop, viewIndex: this.viewIndex }
+          }));
+        };
+
+        // 目标位置和当前位置一致时，无需滚动，直接通知
+        if (Math.abs(currentTop - targetTop) < 1) {
+          notifyComplete();
+          return;
+        }
 
         // 平滑滚动配置（兼容原生smooth行为）
         try {
+          window.addEventListener('scrollend', notifyComplete);
+          // 兜底：scrollend 不触发时按时长估算
+          const estimated = Math.min(800, 200 + Math.abs(targetTop - currentTop) * 0.2);
+          setTimeout(notifyComplete, estimated);
           window.scrollTo({
             top: targetTop,
             behavior: 'smooth' // 原生平滑滚动，丝滑无卡顿
@@ -774,6 +854,8 @@
             window.scrollTo(0, start + distance * easeProgress);
             if (progress < 1) {
               requestAnimationFrame(step);
+            } else {
+              notifyComplete();
             }
           };
           requestAnimationFrame(step);
@@ -791,12 +873,11 @@
           // window.OheaderChange = new OheaderChange();
           // 标记已初始化，防止重复创建
           document.body.dataset[INIT_FLAG] = 'true';
-          console.log("OheaderChange 初始化完成");
+          console.log('%c OheaderChange ✅', 'background:#1a73e8; color:#fff; font-size:13px; font-weight:bold; padding:3px 8px; border-radius:4px;');
         } else {
           console.error("OheaderChange 类未定义，初始化失败");
         }
     } else if (window.OheaderChange) {
-      console.log("OheaderChange 已存在，跳过初始化");
     }
   })
   .catch((err) => {
