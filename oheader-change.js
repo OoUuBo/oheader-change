@@ -325,6 +325,7 @@
 
           .o_nav_bar > oc-toggle-side-bar-button {
             position: absolute;
+            left: 0;
             width: 0.85rem;
           }
 
