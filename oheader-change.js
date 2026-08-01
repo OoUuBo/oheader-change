@@ -834,9 +834,31 @@
 
           // 等新视图渲染完成 → 瞬移到目标位置 → 淡入（内容直接出现在记忆位置，无滚动动画）
           waitForNewViewReady().then(() => {
+            const applyScroll = () => window.scrollTo(0, targetScrollTop);
+
             // 瞬移：内容已渲染完成（updateComplete + 双 rAF），文档高度完整，直接定位
             // （opacity 0 期间执行，用户无感知；晚于 HA 渲染前的 scrollTo(0)，覆盖它）
-            window.scrollTo(0, targetScrollTop);
+            applyScroll();
+            // 帧级兜底：覆盖 2 帧内后到的任何滚动（兼容旧版 HA 的 setTimeout scrollTo(0) 晚到场景）
+            requestAnimationFrame(applyScroll);
+            requestAnimationFrame(() => requestAnimationFrame(applyScroll));
+
+            // 短窗口防覆盖（2025.x 前端：route 变化后 setTimeout(1ms) 无条件滚顶，时序不稳定）：
+            // 仅当页面被"滚回顶部"（非用户手势）时重新瞬移，位置正确或用户开始滚动即停止
+            let userScrolling = false;
+            const markUser = () => { userScrolling = true; };
+            window.addEventListener('pointerdown', markUser, { once: true });
+            window.addEventListener('wheel', markUser, { once: true, passive: true });
+            const guardTimer = setInterval(() => {
+              if (window.scrollY <= 0 && targetScrollTop > 0 && !userScrolling) {
+                applyScroll();
+              } else {
+                clearInterval(guardTimer);
+                window.removeEventListener('pointerdown', markUser);
+                window.removeEventListener('wheel', markUser);
+              }
+            }, 200);
+
             // 保持 o-sticky-card 联动：派发滚动完成事件（原 _smoothScrollTo 内的通知）
             window.dispatchEvent(new CustomEvent('oheader-scroll-restoration-complete', {
               detail: { targetTop: targetScrollTop, viewIndex: newViewIndex }
