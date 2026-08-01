@@ -266,7 +266,7 @@
     const OCToggleSideBarButtonTemplate = document.createElement('template');
     OCToggleSideBarButtonTemplate.innerHTML = /*html*/`
         <style>
-          .o_toggle_side_bar_button {
+            .o_toggle_side_bar_button {
               position: relative;
               display: flex;
               justify-content: center;
@@ -276,8 +276,10 @@
               width: auto;
               height: 100%;
               margin: auto;
+              color: ${DATA.oheaderConfig.color || "var(--app-header-text-color)"};
             }
             .o_toggle_side_bar_button ha-icon { 
+              color: inherit;
               transform: rotate(90deg);
             }
 
@@ -317,6 +319,7 @@
             right: 0;
             height: 100%;
             width: 100%; 
+            padding: 0 1rem;
             background-color: ${DATA.oheaderConfig.background_color || "var(--app-header-background-color)" || "var(--primary-background-color)"};
           }
 
@@ -334,6 +337,7 @@
             .o_nav_bar {
               flex-direction: column;
               justify-content: space-around;
+              padding: 1rem 0;
             }
             .o_nav_bar > * {
               width: 100%;
