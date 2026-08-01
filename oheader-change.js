@@ -585,9 +585,13 @@
         // 1. 检查是否点击了侧边栏切换按钮
         const toggleBtn = e.target.closest("oc-toggle-side-bar-button");
         if (toggleBtn) {
-          if(!DOMS.aside.className.includes("mdc-drawer--open")){
-            DOMS.aside.classList.add("mdc-drawer--open");
-          };
+          // 通过 ha-drawer 的 open 属性切换（走 MDC foundation 正常流程），
+          // 不能直接操作 aside class——会导致 foundation 状态失步，
+          // 后续点击侧边栏菜单项时无法自动关闭
+          const isOpen = DOMS.aside.className.includes("mdc-drawer--open");
+          if (DOMS.drawer) {
+            DOMS.drawer.open = !isOpen;
+          }
           return;
         }
 
