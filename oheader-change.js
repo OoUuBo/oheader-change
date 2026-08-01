@@ -33,6 +33,27 @@
   const info = "border-width:0px 1px 1px 1px;padding:7px;background:white;color:#424242;line-height:0.7;";
   console.info(conInfo.header + br + conInfo.ver, header, "", `${header} ${info}`);
 
+  // 无缝替换：注入全局样式，让 Lovelace 原生 header 从渲染起就是透明的（背景/文字/图标/边框全透明）
+  // 通过 CSS 变量穿透 Shadow DOM 生效，作用域限定 ha-panel-lovelace，不影响其他面板
+  (() => {
+    const origHeaderBg =
+      getComputedStyle(document.documentElement)
+        .getPropertyValue('--app-header-background-color').trim()
+      || 'var(--primary-background-color)';
+    const style = document.createElement('style');
+    style.textContent = `
+      ha-panel-lovelace {
+        --app-header-background-color: transparent !important;
+        --app-header-text-color: transparent !important;
+        --app-header-border-bottom: none !important;
+      }
+      ha-panel-lovelace oc-nav-bar {
+        --app-header-background-color: ${origHeaderBg};
+      }
+    `;
+    document.head.appendChild(style);
+  })();
+
   // 等待 hui-view 定义完成， 初始化
   Promise.resolve(customElements.whenDefined("hui-view")).then(async() => {
     // 缓存数组：DOMS 和 DATA
