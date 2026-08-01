@@ -803,12 +803,18 @@
 
           const targetScrollTop = this.scrollTopArr[newViewIndex] || 0;
 
-          // 等新视图渲染完成 → 滚动 → 淡入（掩盖首次渲染的突变）
+          // 等新视图渲染完成 → 瞬移到目标位置 → 淡入（内容直接出现在记忆位置，无滚动动画）
           waitForNewViewReady().then(() => {
+            // 瞬移：内容已渲染完成（updateComplete + 双 rAF），文档高度完整，直接定位
+            // （opacity 0 期间执行，用户无感知；晚于 HA 渲染前的 scrollTo(0)，覆盖它）
+            window.scrollTo(0, targetScrollTop);
+            // 保持 o-sticky-card 联动：派发滚动完成事件（原 _smoothScrollTo 内的通知）
+            window.dispatchEvent(new CustomEvent('oheader-scroll-restoration-complete', {
+              detail: { targetTop: targetScrollTop, viewIndex: newViewIndex }
+            }));
             if (viewEl) {
               viewEl.style.transition = 'opacity 0.06s ease-out';
             }
-            this._smoothScrollTo(targetScrollTop, true);
             requestAnimationFrame(() => {
               if (viewEl) viewEl.style.opacity = '1';
             });
