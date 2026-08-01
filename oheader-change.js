@@ -152,15 +152,15 @@
             transform: scale(0.88);
           }
 
-          /* 激活按钮样式：图标/文字变主题色，文字加粗 */
+          /* 激活按钮样式：图标/文字变激活色（可配 activeColor，默认金色适配 lino 主题），文字加粗 */
           .o_nav_button.active {
             opacity: 1;
           }
           .o_nav_button.active ha-icon {
-            color: var(--primary-color);
+            color: ${DATA.oheaderConfig.activeColor || "var(--color-gold)"};
           }
           .o_nav_button.active p {
-            color: var(--primary-color);
+            color: ${DATA.oheaderConfig.activeColor || "var(--color-gold)"};
             font-weight: bold;
           }
           @media screen and (orientation: landscape) { 
