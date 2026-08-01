@@ -423,6 +423,12 @@
           childList: true,
         });
 
+        // 观察 ha-panel-lovelace shadowRoot：hui-root 出现立即处理（微任务时机，远快于轮询重试），
+        // 让原生 header 与 oc-nav-bar 的替换在同一绘制帧内完成，进入界面无缝
+        new MutationObserver(() => {
+          if (!DOMS.hui) this.run();
+        }).observe(DOMS.lovelace.shadowRoot, { childList: true });
+
         // 调用主函数
         this.run();
       }
@@ -798,7 +804,7 @@
           // 当前不是 Lovelace 面板则不空跑
           if (!DOMS.ppr?.querySelector("ha-panel-lovelace")) return;
           this.run();
-        }, 500);
+        }, 100);
       };
 
       /**
