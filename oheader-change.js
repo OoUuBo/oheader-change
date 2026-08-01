@@ -127,8 +127,7 @@
             border-radius: 5px;
             cursor: pointer;
             opacity: 0.7;
-            transition: opacity 0.2s ease-in-out;
-            transition: background-color 0.3s;
+            transition: opacity 0.2s ease-in-out, transform 0.1s;
             width: 50px;
             height: 100%;
             color: ${DATA.oheaderConfig.color || "var(--app-header-text-color)"};
@@ -148,10 +147,21 @@
             margin:5px 0px;
           }
 
-          /* 激活按钮样式 */
+          /* 按压反馈：点击瞬间缩小 */
+          .o_nav_button:active {
+            transform: scale(0.88);
+          }
+
+          /* 激活按钮样式：图标/文字变主题色，文字加粗 */
           .o_nav_button.active {
             opacity: 1;
-            <!-- color: red; -->
+          }
+          .o_nav_button.active ha-icon {
+            color: var(--primary-color);
+          }
+          .o_nav_button.active p {
+            color: var(--primary-color);
+            font-weight: bold;
           }
           @media screen and (orientation: landscape) { 
             .o_nav_button {
