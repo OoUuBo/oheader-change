@@ -585,12 +585,15 @@
         // 1. 检查是否点击了侧边栏切换按钮
         const toggleBtn = e.target.closest("oc-toggle-side-bar-button");
         if (toggleBtn) {
-          // 通过 ha-drawer 的 open 属性切换（走 MDC foundation 正常流程），
-          // 不能直接操作 aside class——会导致 foundation 状态失步，
-          // 后续点击侧边栏菜单项时无法自动关闭
+          // 通过 HA 原生的 hass-toggle-menu 事件切换（与 ha-menu-button 同链路），
+          // 同步 home-assistant-main 的 _drawerOpen 状态；
+          // 直接设 drawer.open 会绕过 state，导致路由变化时无法自动关闭
           const isOpen = DOMS.aside.className.includes("mdc-drawer--open");
-          if (DOMS.drawer) {
-            DOMS.drawer.open = !isOpen;
+          const mainEl = DOMS.mainRoot.host; // home-assistant-main 元素
+          if (mainEl) {
+            mainEl.dispatchEvent(new CustomEvent("hass-toggle-menu", {
+              detail: { open: !isOpen }
+            }));
           }
           return;
         }
